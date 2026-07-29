@@ -166,9 +166,9 @@ jobs:
         if: ${{ inputs.enable_yq }}
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouQuality.git
 
-      - name: Clone YouSlider
-        if: ${{ inputs.enable_youslider }}
-        run: git clone --quiet https://github.com/PoomSmart/YouSlider.git
+      #- name: Clone YouSlider
+        #if: ${{ inputs.enable_youslider }}
+        #run: git clone --quiet https://github.com/PoomSmart/YouSlider.git
 
       - name: Clone YTFlags
         if: ${{ inputs.enable_ytflags }}
@@ -223,11 +223,11 @@ jobs:
           cd YouQuality && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
           mv packages/*.deb ../yq.deb
 
-      - name: Build YouSlider
-        if: ${{ inputs.enable_youslider }}
-        run: |
-          cd YouSlider && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless ADDITIONAL_CFLAGS="-Wno-error=incompatible-pointer-types"
-          mv packages/*.deb ../youslider.deb
+      #- name: Build YouSlider
+        #if: ${{ inputs.enable_youslider }}
+        #run: |
+          #cd YouSlider && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless ADDITIONAL_CFLAGS="-Wno-error=incompatible-pointer-types"
+          #mv packages/*.deb ../youslider.deb
 
       - name: Build YTFlags
         if: ${{ inputs.enable_ytflags }}
