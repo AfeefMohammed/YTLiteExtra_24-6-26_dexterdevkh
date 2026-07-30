@@ -1,0 +1,267 @@
+name: Build Tweaks URL (Helper)
+
+on:
+  workflow_call:
+    inputs:
+      enable_youpip:
+        type: boolean
+        required: true
+        default: true
+
+      enable_yq:
+        type: boolean
+        required: true
+        default: true
+
+      enable_ytflags:
+        type: boolean
+        required: true
+        default: true
+
+      enable_youspeed:
+        type: boolean
+        required: true
+        default: true
+
+      enable_ygc:
+        type: boolean
+        required: true
+        default: true
+
+      enable_ryd:
+        type: boolean
+        required: true
+        default: true
+
+      enable_ytabc:
+        type: boolean
+        required: true
+        default: true
+
+      enable_demc:
+        type: boolean
+        required: true
+        default: true
+
+      enable_ycq:
+        type: boolean
+        required: true
+        default: false
+
+      enable_ytuhd:
+        type: boolean
+        required: true
+        default: false
+
+      enable_vbyt:
+        type: boolean
+        required: true
+        default: false
+
+      enable_ytamp:
+        type: boolean
+        required: true
+        default: false
+
+      tweak_url:
+        type: string
+        required: true
+        default: ""
+
+jobs:
+  build-tweaks:
+    name: Build Tweaks
+    runs-on: macos-latest
+
+    steps:
+      - name: Install Dependencies
+        run: brew install make ldid dpkg
+
+      - name: Set PATH environment variable
+        run: |
+          echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
+          echo "THEOS=${{ github.workspace }}/theos" >> $GITHUB_ENV
+
+      - name: Cache Theos
+        id: theos
+        uses: actions/cache@v5
+        env:
+          cache-name: theos_cache_9bc7340
+        with:
+          path: theos/
+          key: ${{ env.cache-name }}
+          restore-keys: ${{ env.cache-name }}
+
+      - name: Setup Theos
+        if: steps.theos.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: theos/theos
+          ref: 9bc73406cf80b711ef4d02c15ff1dedc4478a275
+          path: theos
+          submodules: recursive
+
+      - name: Download iOS SDK
+        if: steps.theos.outputs.cache-hit != 'true'
+        run: |
+          git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
+          git checkout
+          mv *.sdk $THEOS/sdks
+
+      - name: Download YouTube Plus (by URL)
+        run: |
+          wget "${{ inputs.tweak_url }}" --no-verbose -O ytplus.deb
+          file_type=$(file --mime-type -b ytplus.deb)
+          if [[ "$file_type" != "application/vnd.debian.binary-package" ]]; then
+            echo "::error::Validation failed: The file is not a valid DEB file. Detected type: $file_type."
+            exit 1
+          fi
+
+      - name: Clone YouTubeHeader
+        run: |
+          if [ -d "$THEOS/include/YouTubeHeader" ]; then
+            cd $THEOS/include/YouTubeHeader && git pull
+          else
+            cd $THEOS/include && git clone --quiet --depth=1 https://github.com/PoomSmart/YouTubeHeader.git
+          fi
+          if [ "${{ inputs.enable_demc }}" = "true" ]; then
+            rm -rf "$THEOS/include/YTHeaders"
+            cp -r "$THEOS/include/YouTubeHeader" "$THEOS/include/YTHeaders"
+          fi
+
+      - name: Clone PSHeader
+        run: |
+          if [ -d "$THEOS/include/PSHeader" ]; then
+            cd $THEOS/include/PSHeader && git pull
+          else
+            cd $THEOS/include && git clone --quiet --depth=1 https://github.com/PoomSmart/PSHeader.git
+          fi
+
+      # Core Required Helper Tweaks
+      - name: Clone IAmYouTube
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/IAmYouTube.git
+
+      - name: Clone YouGroupSettings
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouGroupSettings.git
+
+      - name: Clone YTVideoOverlay
+        if: ${{ inputs.enable_youpip || inputs.enable_yq || inputs.enable_ycq }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YTVideoOverlay.git
+
+      # Selected Feature Tweaks
+      - name: Clone YouPiP
+        if: ${{ inputs.enable_youpip }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouPiP.git
+
+      - name: Clone YouQuality
+        if: ${{ inputs.enable_yq }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouQuality.git
+
+      - name: Clone YTFlags
+        if: ${{ inputs.enable_ytflags }}
+        run: git clone --quiet --depth=1 https://github.com/Tonwalter888/YTFlags.git
+
+      - name: Clone YouSpeed
+        if: ${{ inputs.enable_youspeed }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouSpeed.git
+
+      - name: Clone YouGetCaption
+        if: ${{ inputs.enable_ygc }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouGetCaption.git
+
+      - name: Clone Return-YouTube-Dislikes
+        if: ${{ inputs.enable_ryd }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/Return-YouTube-Dislikes.git
+
+      - name: Clone YTABConfig
+        if: ${{ inputs.enable_ytabc }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YTABConfig.git
+
+      - name: Clone DontEatMyContent
+        if: ${{ inputs.enable_demc }}
+        run: git clone --quiet --depth=1 https://github.com/therealFoxster/DontEatMyContent.git
+
+      # Build Steps
+      - name: Build IAmYouTube
+        run: |
+          cd IAmYouTube && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../imyt.deb
+
+      - name: Build YouGroupSettings
+        run: |
+          cd YouGroupSettings && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../ygs.deb
+
+      - name: Build YTVideoOverlay
+        if: ${{ inputs.enable_youpip || inputs.enable_yq || inputs.enable_ycq }}
+        run: |
+          cd YTVideoOverlay && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../ytvo.deb
+
+      - name: Build YouPiP
+        if: ${{ inputs.enable_youpip }}
+        run: |
+          cd YouPiP && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../youpip.deb
+
+      - name: Build YouQuality
+        if: ${{ inputs.enable_yq }}
+        run: |
+          cd YouQuality && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../yq.deb
+
+      - name: Build YTFlags
+        if: ${{ inputs.enable_ytflags }}
+        run: |
+          cd YTFlags && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless ADDITIONAL_CFLAGS="-Wno-error=incompatible-pointer-types"
+          mv packages/*.deb ../ytflags.deb
+
+      - name: Build YouSpeed
+        if: ${{ inputs.enable_youspeed }}
+        run: |
+          cd YouSpeed && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../youspeed.deb
+
+      - name: Build YouGetCaption
+        if: ${{ inputs.enable_ygc }}
+        run: |
+          cd YouGetCaption && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../ygc.deb
+
+      - name: Build Return-YouTube-Dislikes
+        if: ${{ inputs.enable_ryd }}
+        run: |
+          cd Return-YouTube-Dislikes && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../ryd.deb
+
+      - name: Build YTABConfig
+        if: ${{ inputs.enable_ytabc }}
+        run: |
+          cd YTABConfig && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../ytabc.deb
+
+      - name: Build DontEatMyContent
+        if: ${{ inputs.enable_demc }}
+        run: |
+          cd DontEatMyContent && make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb ../demc.deb
+
+      - name: Clone Open in YouTube (Safari extension)
+        run: |
+          git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/BillyCurtis/OpenYouTubeSafariExtension
+          cd OpenYoutubeSafariExtension
+          git sparse-checkout set --no-cone OpenYoutubeSafariExtension.appex
+          git checkout
+          mv *.appex ..
+
+      - name: Upload built debs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-debs
+          path: |
+            *.deb
+            *.appex
+          if-no-files-found: ignore
+          retention-days: 1
